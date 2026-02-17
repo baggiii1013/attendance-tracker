@@ -1,26 +1,465 @@
 @import "tailwindcss";
 
-:root {
-  --background: #ffffff;
-  --foreground: #171717;
-}
+/* ============================================
+   Glass & Steel — Skeuomorphic Design System
+   ============================================ */
 
 @theme inline {
-  --color-background: var(--background);
-  --color-foreground: var(--foreground);
-  --font-sans: var(--font-geist-sans);
-  --font-mono: var(--font-geist-mono);
+  --color-void: #0F0F11;
+  --color-void-light: #1a1a1f;
+  --color-primary: #805af2;
+  --color-primary-dim: rgba(128, 90, 242, 0.2);
+  --color-coral: #FF4D4D;
+  --color-cobalt: #4D79FF;
+  --color-glass-surface: rgba(255, 255, 255, 0.08);
+  --color-glass-border: rgba(255, 255, 255, 0.15);
+  --color-chrome-light: #F0F0F0;
+  --color-chrome-mid: #B0B0B0;
+  --color-chrome-dark: #909090;
+
+  --font-display: "Space Grotesk", sans-serif;
+  --font-mono: "JetBrains Mono", monospace;
 }
 
-@media (prefers-color-scheme: dark) {
-  :root {
-    --background: #0a0a0a;
-    --foreground: #ededed;
-  }
+/* ============================================
+   Base Styles
+   ============================================ */
+
+:root {
+  --background: #0F0F11;
+  --foreground: #ededed;
+}
+
+html {
+  color-scheme: dark;
 }
 
 body {
   background: var(--background);
   color: var(--foreground);
-  font-family: Arial, Helvetica, sans-serif;
+  font-family: var(--font-display);
+  -webkit-font-smoothing: antialiased;
+  -moz-osx-font-smoothing: grayscale;
+}
+
+/* Hide scrollbar */
+.no-scrollbar::-webkit-scrollbar {
+  display: none;
+}
+.no-scrollbar {
+  -ms-overflow-style: none;
+  scrollbar-width: none;
+}
+
+/* ============================================
+   Glass Panel — Frosted glass containers
+   ============================================ */
+.glass-panel {
+  background: rgba(255, 255, 255, 0.03);
+  backdrop-filter: blur(20px);
+  -webkit-backdrop-filter: blur(20px);
+  border: 1px solid rgba(255, 255, 255, 0.1);
+}
+
+/* ============================================
+   Acrylic Block — Status cards
+   ============================================ */
+.acrylic-block {
+  background: rgba(30, 30, 35, 0.6);
+  backdrop-filter: blur(20px);
+  -webkit-backdrop-filter: blur(20px);
+  border-top: 1px solid rgba(255, 255, 255, 0.15);
+  border-left: 1px solid rgba(255, 255, 255, 0.1);
+  border-right: 1px solid rgba(0, 0, 0, 0.5);
+  border-bottom: 1px solid rgba(0, 0, 0, 0.7);
+  box-shadow:
+    0 8px 32px rgba(0, 0, 0, 0.4),
+    inset 0 1px 0 rgba(255, 255, 255, 0.05);
+  position: relative;
+}
+
+.acrylic-block::before {
+  content: "";
+  position: absolute;
+  inset: 0;
+  background: linear-gradient(
+    135deg,
+    rgba(255, 255, 255, 0.04) 0%,
+    transparent 50%
+  );
+  pointer-events: none;
+  border-radius: inherit;
+}
+
+/* ============================================
+   Brushed Steel Panel — Header panels
+   ============================================ */
+.brushed-steel-panel {
+  background-color: #252528;
+  background-image: repeating-linear-gradient(
+      90deg,
+      transparent 0,
+      transparent 2px,
+      rgba(0, 0, 0, 0.2) 2px,
+      rgba(0, 0, 0, 0.2) 4px
+    ),
+    linear-gradient(180deg, #444 0%, #222 100%);
+  box-shadow:
+    inset 0 1px 0 rgba(255, 255, 255, 0.2),
+    inset 0 -1px 0 rgba(0, 0, 0, 0.5),
+    0 10px 20px rgba(0, 0, 0, 0.5);
+  border-bottom: 1px solid #111;
+}
+
+/* ============================================
+   Chrome Text Effect
+   ============================================ */
+.chrome-text {
+  background: linear-gradient(to bottom, #ffffff 0%, #a49db9 100%);
+  -webkit-background-clip: text;
+  -webkit-text-fill-color: transparent;
+  background-clip: text;
+}
+
+.chrome-text-hero {
+  background: linear-gradient(
+    to bottom,
+    #ffffff 0%,
+    #a0a0a0 50%,
+    #404040 51%,
+    #e0e0e0 100%
+  );
+  -webkit-background-clip: text;
+  -webkit-text-fill-color: transparent;
+  background-clip: text;
+}
+
+/* ============================================
+   Neon Text Glow
+   ============================================ */
+.neon-text-glow {
+  text-shadow: 0 0 20px rgba(128, 90, 242, 0.6);
+}
+
+/* ============================================
+   Claymorphism Buttons
+   ============================================ */
+.btn-clay {
+  background: #805af2;
+  box-shadow:
+    inset 2px 2px 4px rgba(255, 255, 255, 0.4),
+    inset -4px -4px 8px rgba(0, 0, 0, 0.4),
+    0 10px 20px rgba(0, 0, 0, 0.5);
+  transition: all 0.1s ease;
+}
+.btn-clay:active {
+  transform: scale(0.98);
+  box-shadow:
+    inset 4px 4px 8px rgba(0, 0, 0, 0.4),
+    inset -2px -2px 4px rgba(255, 255, 255, 0.2),
+    0 2px 5px rgba(0, 0, 0, 0.5);
+}
+
+.btn-coral {
+  background: linear-gradient(145deg, #ff5e5e, #e64545);
+  box-shadow:
+    inset 0 2px 4px rgba(255, 255, 255, 0.4),
+    inset 0 -4px 8px rgba(0, 0, 0, 0.2),
+    8px 8px 16px #050505,
+    -4px -4px 12px rgba(255, 255, 255, 0.05);
+  transition: all 0.1s ease;
+}
+.btn-coral:active {
+  transform: scale(0.95);
+}
+
+/* ============================================
+   Metal Buttons
+   ============================================ */
+.btn-metal {
+  background: linear-gradient(145deg, #2a2a2e, #1e1e22);
+  box-shadow:
+    5px 5px 10px #0b0b0d,
+    -5px -5px 10px #232327;
+}
+.btn-metal:active {
+  background: #1e1e22;
+  box-shadow: inset 5px 5px 10px #0b0b0d, inset -5px -5px 10px #232327;
+}
+
+/* ============================================
+   Neumorphic Plump Buttons
+   ============================================ */
+.shadow-plump {
+  box-shadow:
+    8px 8px 16px #050505,
+    -4px -4px 12px rgba(255, 255, 255, 0.05),
+    inset 2px 2px 4px rgba(255, 255, 255, 0.1);
+}
+.shadow-plump-inset {
+  box-shadow:
+    inset 4px 4px 8px #050505,
+    inset -2px -2px 6px rgba(255, 255, 255, 0.1);
+}
+
+/* ============================================
+   LED Strip Indicators
+   ============================================ */
+.led-strip {
+  display: flex;
+  gap: 2px;
+  height: 6px;
+}
+
+.led-segment {
+  flex: 1;
+  border-radius: 1px;
+  background: rgba(255, 255, 255, 0.05);
+  border: 1px solid rgba(255, 255, 255, 0.03);
+}
+
+.led-segment.active-green {
+  background: #22c55e;
+  box-shadow: 0 0 6px rgba(34, 197, 94, 0.8);
+}
+
+.led-segment.active-yellow {
+  background: #eab308;
+  box-shadow: 0 0 6px rgba(234, 179, 8, 0.6);
+}
+
+.led-segment.active-red {
+  background: #ef4444;
+  box-shadow: 0 0 6px rgba(239, 68, 68, 0.8);
+  animation: pulse-red 2s infinite;
+}
+
+@keyframes pulse-red {
+  0%,
+  100% {
+    opacity: 1;
+  }
+  50% {
+    opacity: 0.5;
+    box-shadow: 0 0 2px #f87171;
+  }
+}
+
+.led-segment.active-blue {
+  background: #3b82f6;
+  box-shadow: 0 0 6px rgba(59, 130, 246, 0.8);
+}
+
+/* ============================================
+   Metal Toggle Switch
+   ============================================ */
+.metal-toggle {
+  width: 44px;
+  height: 24px;
+  background: linear-gradient(180deg, #1a1a1a 0%, #252525 100%);
+  border-radius: 12px;
+  border: 1px solid #333;
+  box-shadow:
+    inset 0 2px 4px rgba(0, 0, 0, 0.8),
+    0 1px 0 rgba(255, 255, 255, 0.1);
+  position: relative;
+  cursor: pointer;
+  transition: all 0.2s ease;
+}
+
+.metal-toggle-knob {
+  position: absolute;
+  top: 2px;
+  left: 2px;
+  width: 18px;
+  height: 18px;
+  border-radius: 50%;
+  background: linear-gradient(145deg, #555, #333);
+  box-shadow:
+    0 2px 4px rgba(0, 0, 0, 0.5),
+    inset 0 1px 0 rgba(255, 255, 255, 0.3);
+  transition: all 0.2s ease;
+}
+
+.metal-toggle-knob::after {
+  content: "";
+  position: absolute;
+  top: 50%;
+  left: 50%;
+  transform: translate(-50%, -50%);
+  width: 8px;
+  height: 8px;
+  border-radius: 50%;
+  background: #222;
+  box-shadow: inset 0 1px 2px rgba(0, 0, 0, 0.5);
+}
+
+.metal-toggle.checked .metal-toggle-knob {
+  left: 22px;
+}
+
+.metal-toggle.checked .metal-toggle-knob::after {
+  background: #00cc44;
+  box-shadow: 0 0 5px #00cc44;
+}
+
+/* ============================================
+   Screw Head Decoration
+   ============================================ */
+.screw-head {
+  width: 10px;
+  height: 10px;
+  border-radius: 50%;
+  background: linear-gradient(145deg, #3a3a3a, #222);
+  box-shadow:
+    inset 0 1px 2px rgba(0, 0, 0, 0.8),
+    0 1px 0 rgba(255, 255, 255, 0.1);
+  position: relative;
+}
+
+.screw-head::before {
+  content: "";
+  position: absolute;
+  top: 50%;
+  left: 50%;
+  transform: translate(-50%, -50%) rotate(45deg);
+  width: 6px;
+  height: 1px;
+  background: #111;
+}
+
+.screw-head::after {
+  content: "";
+  position: absolute;
+  top: 50%;
+  left: 50%;
+  transform: translate(-50%, -50%) rotate(-45deg);
+  width: 6px;
+  height: 1px;
+  background: #111;
+}
+
+/* ============================================
+   Scanline Overlay
+   ============================================ */
+.scanlines {
+  background: repeating-linear-gradient(
+    0deg,
+    rgba(0, 0, 0, 0.15) 0px,
+    rgba(0, 0, 0, 0.15) 1px,
+    transparent 1px,
+    transparent 3px
+  );
+  pointer-events: none;
+}
+
+/* ============================================
+   Chrome Gradient Backgrounds
+   ============================================ */
+.bg-chrome-gradient {
+  background: linear-gradient(135deg, #e2e2e2 0%, #b0b0b0 50%, #808080 100%);
+}
+
+.shadow-chrome {
+  box-shadow:
+    inset 2px 2px 4px rgba(255, 255, 255, 0.4),
+    4px 4px 10px rgba(0, 0, 0, 0.5);
+}
+
+.shadow-chrome-pressed {
+  box-shadow:
+    inset 4px 4px 8px rgba(0, 0, 0, 0.6),
+    inset -2px -2px 6px rgba(255, 255, 255, 0.2);
+}
+
+/* ============================================
+   Etched Text Effect
+   ============================================ */
+.etched-text {
+  color: rgba(255, 255, 255, 0.7);
+  text-shadow:
+    -1px -1px 0 rgba(0, 0, 0, 0.8),
+    1px 1px 0 rgba(255, 255, 255, 0.1);
+}
+
+/* ============================================
+   LED Shadow Utilities
+   ============================================ */
+.shadow-led-green {
+  box-shadow: 0 0 8px rgba(34, 197, 94, 0.8);
+}
+
+.shadow-led-red {
+  box-shadow: 0 0 8px rgba(239, 68, 68, 0.8);
+}
+
+.shadow-led-blue {
+  box-shadow: 0 0 8px rgba(59, 130, 246, 0.8);
+}
+
+/* ============================================
+   Timer Progress Ring
+   ============================================ */
+.progress-ring__circle {
+  transition: stroke-dashoffset 0.35s;
+  transform: rotate(-90deg);
+  transform-origin: 50% 50%;
+}
+
+/* ============================================
+   Animations
+   ============================================ */
+@keyframes float {
+  0% {
+    transform: translateY(0px) rotateX(0deg) rotateY(0deg);
+  }
+  50% {
+    transform: translateY(-15px) rotateX(5deg) rotateY(5deg);
+  }
+  100% {
+    transform: translateY(0px) rotateX(0deg) rotateY(0deg);
+  }
+}
+
+@keyframes subtle-spin {
+  0% {
+    transform: rotate(0deg);
+  }
+  100% {
+    transform: rotate(360deg);
+  }
+}
+
+.animate-float {
+  animation: float 6s ease-in-out infinite;
+}
+
+.perspective-1000 {
+  perspective: 1000px;
+}
+
+.transform-style-3d {
+  transform-style: preserve-3d;
+}
+
+/* ============================================
+   Glass Input Fields
+   ============================================ */
+.glass-input {
+  background: var(--color-glass-surface);
+  backdrop-filter: blur(20px);
+  -webkit-backdrop-filter: blur(20px);
+  border: 1px solid var(--color-glass-border);
+}
+
+.glass-input:focus {
+  border-color: rgba(77, 121, 255, 0.5);
+  box-shadow: 0 0 0 2px rgba(77, 121, 255, 0.15);
+}
+
+/* ============================================
+   Void Gradient Backgrounds
+   ============================================ */
+.bg-void-gradient {
+  background: radial-gradient(circle at 50% 0%, #2a2438 0%, #0f0f11 70%);
 }
