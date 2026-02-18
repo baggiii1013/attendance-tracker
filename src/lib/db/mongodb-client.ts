@@ -1,44 +1,10 @@
-import { MongoClient } from "mongodb";
+/**
+ * Re-exports getMongoClient from the unified Mongoose-based connection.
+ *
+ * Previously this file maintained its own native MongoClient pool, which meant
+ * two independent connection pools hitting the same Atlas cluster — doubling
+ * connection usage on every serverless instance.  Now both Mongoose queries and
+ * the NextAuth MongoDBAdapter share a single pool managed by Mongoose.
+ */
+export { getMongoClient } from "./connection";
 
-const MONGODB_URI = process.env.MONGODB_URI!;
-
-if (!MONGODB_URI) {
-  throw new Error("Please define the MONGODB_URI environment variable in .env.local");
-}
-
-interface MongoClientCache {
-  client: MongoClient | null;
-  promise: Promise<MongoClient> | null;
-}
-
-declare global {
-  // eslint-disable-next-line no-var
-  var _mongoClientPromise: MongoClientCache | undefined;
-}
-
-const cached: MongoClientCache = global._mongoClientPromise ?? {
-  client: null,
-  promise: null,
-};
-
-if (!global._mongoClientPromise) {
-  global._mongoClientPromise = cached;
-}
-
-export function getMongoClient(): Promise<MongoClient> {
-  if (cached.client) {
-    return Promise.resolve(cached.client);
-  }
-
-  if (!cached.promise) {
-    const client = new MongoClient(MONGODB_URI);
-    cached.promise = client.connect().then((c) => {
-      cached.client = c;
-      return c;
-    });
-  }
-
-  return cached.promise;
-}
-
-export default getMongoClient;
