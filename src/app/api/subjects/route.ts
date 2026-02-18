@@ -11,11 +11,15 @@ export async function GET() {
   }
 
   await connectDB();
-  const subjects = await Subject.find({ userId: session.user.id, isActive: true }).sort({ startTime: 1 });
+  const subjects = await Subject.find({
+    userId: session.user.id,
+    isActive: true,
+  }).sort({ createdAt: -1 });
+
   return NextResponse.json({ subjects });
 }
 
-// POST /api/subjects — create a new subject
+// POST /api/subjects — create a new subject with schedule slots
 export async function POST(req: NextRequest) {
   const session = await auth();
   if (!session?.user?.id) {
@@ -23,19 +27,37 @@ export async function POST(req: NextRequest) {
   }
 
   const body = await req.json();
-  const { name, startTime, endTime, activeDays, color } = body;
+  const { name, slots, color } = body;
 
-  if (!name || !startTime || !endTime || !activeDays?.length) {
-    return NextResponse.json({ error: "Missing required fields" }, { status: 400 });
+  if (!name || !slots?.length) {
+    return NextResponse.json(
+      { error: "Missing required fields (name, slots)" },
+      { status: 400 }
+    );
+  }
+
+  // Validate slots structure
+  for (const slot of slots) {
+    if (!slot.day || !slot.startTime || !slot.endTime) {
+      return NextResponse.json(
+        { error: "Each slot must have day, startTime, and endTime" },
+        { status: 400 }
+      );
+    }
   }
 
   await connectDB();
+
   const subject = await Subject.create({
     userId: session.user.id,
     name,
-    startTime,
-    endTime,
-    activeDays,
+    schedules: [
+      {
+        slots,
+        effectiveFrom: new Date(),
+        effectiveTo: null,
+      },
+    ],
     color: color || "#805af2",
     isActive: true,
   });

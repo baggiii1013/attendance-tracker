@@ -13,6 +13,8 @@ export default async function AuthenticatedLayout({
     redirect("/");
   }
 
+  const role = (session.user as any).role as string | undefined;
+
   return (
     <div className="relative flex flex-col min-h-screen max-w-md md:max-w-2xl lg:max-w-4xl mx-auto bg-[#0d0d0f] border-x border-[#222] overflow-hidden">
       {/* Scanline overlay */}
@@ -28,7 +30,7 @@ export default async function AuthenticatedLayout({
       </div>
 
       {/* Bottom Navigation */}
-      <BottomNav />
+      <BottomNav role={role} />
     </div>
   );
 }

@@ -14,6 +14,7 @@ interface DashboardData {
     name: string;
     email: string;
     image: string | null;
+    role: string;
     xp: number;
     currentStreak: number;
     longestStreak: number;
@@ -23,9 +24,8 @@ interface DashboardData {
   subjects: Array<{
     _id: string;
     name: string;
-    startTime: string;
-    endTime: string;
-    activeDays: string[];
+    slots: Array<{ day: string; startTime: string; endTime: string }>;
+    displayTime: string;
     color: string;
     isScheduledToday: boolean;
     sessionStatus: "active" | "upcoming" | "completed" | "inactive";

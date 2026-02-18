@@ -17,6 +17,15 @@ export async function awardXP(userId: string, amount: number): Promise<IUser | n
   );
 }
 
+export async function reverseXP(userId: string, amount: number): Promise<IUser | null> {
+  await connectDB();
+  return User.findByIdAndUpdate(
+    userId,
+    { $inc: { xp: -amount } },
+    { new: true }
+  );
+}
+
 export function getStreakBonus(streak: number): number {
   if (streak === 100) return XP_STREAK_100;
   if (streak === 30) return XP_STREAK_30;

@@ -5,7 +5,7 @@ import GlassPanel from "@/components/ui/GlassPanel";
 import { MaterialIcon } from "@/components/ui/Icons";
 import { format } from "date-fns";
 import { motion } from "framer-motion";
-import type { AttendanceRecord, DayData } from "./CalendarClient";
+import { getSlotForDate, type AttendanceRecord, type DayData } from "./CalendarClient";
 
 interface DayDetailSheetProps {
   date: Date;
@@ -137,11 +137,16 @@ export default function DayDetailSheet({
                                 <span className="text-sm font-mono text-gray-200 truncate">
                                   {subject?.name || "Unknown"}
                                 </span>
-                                {subject?.startTime && subject?.endTime && (
-                                  <span className="text-[9px] font-mono text-gray-600">
-                                    {subject.startTime} — {subject.endTime}
-                                  </span>
-                                )}
+                                {(() => {
+                                  const slot = subject?.schedules
+                                    ? getSlotForDate(subject.schedules, date)
+                                    : null;
+                                  return slot ? (
+                                    <span className="text-[9px] font-mono text-gray-600">
+                                      {slot.startTime} — {slot.endTime}
+                                    </span>
+                                  ) : null;
+                                })()}
                               </div>
                             </div>
                             <StatusBadge status={record.status} />

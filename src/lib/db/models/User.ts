@@ -1,17 +1,21 @@
 import mongoose, { Document, Model, Schema } from "mongoose";
 
+export type UserRole = "user" | "admin";
+
 export interface IUser extends Document {
   _id: mongoose.Types.ObjectId;
   name: string;
   email: string;
   image?: string;
   emailVerified?: Date;
+  role: UserRole;
   xp: number;
   currentStreak: number;
   longestStreak: number;
   lastAttendanceDate?: Date;
   totalAttendanceDays: number;
   totalScheduledDays: number;
+  isDisabled: boolean;
   createdAt: Date;
   updatedAt: Date;
 }
@@ -22,12 +26,14 @@ const UserSchema = new Schema<IUser>(
     email: { type: String, required: true, unique: true },
     image: { type: String },
     emailVerified: { type: Date },
+    role: { type: String, enum: ["user", "admin"], default: "user" },
     xp: { type: Number, default: 0 },
     currentStreak: { type: Number, default: 0 },
     longestStreak: { type: Number, default: 0 },
     lastAttendanceDate: { type: Date },
     totalAttendanceDays: { type: Number, default: 0 },
     totalScheduledDays: { type: Number, default: 0 },
+    isDisabled: { type: Boolean, default: false },
   },
   {
     timestamps: true,

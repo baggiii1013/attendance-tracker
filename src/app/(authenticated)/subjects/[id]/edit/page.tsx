@@ -1,6 +1,6 @@
 import { auth } from "@/lib/auth";
 import { connectDB } from "@/lib/db/connection";
-import Subject from "@/lib/db/models/Subject";
+import Subject, { IScheduleEntry, IScheduleSlot } from "@/lib/db/models/Subject";
 import { notFound } from "next/navigation";
 import SubjectForm from "../../new/SubjectForm";
 
@@ -23,14 +23,24 @@ export default async function EditSubjectPage({ params }: Props) {
     notFound();
   }
 
+  // Get the current active schedule's slots
+  const currentSchedule = (subject.schedules || []).find(
+    (s: IScheduleEntry) => s.effectiveTo === null
+  );
+  const slots = currentSchedule
+    ? currentSchedule.slots.map((s: IScheduleSlot) => ({
+        day: s.day,
+        startTime: s.startTime,
+        endTime: s.endTime,
+      }))
+    : [{ day: "Mon", startTime: "09:00", endTime: "10:30" }];
+
   return (
     <SubjectForm
       initialData={{
         _id: subject._id.toString(),
         name: subject.name,
-        startTime: subject.startTime,
-        endTime: subject.endTime,
-        activeDays: subject.activeDays,
+        slots,
         color: subject.color,
       }}
     />

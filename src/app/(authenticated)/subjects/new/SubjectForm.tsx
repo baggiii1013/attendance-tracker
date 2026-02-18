@@ -26,13 +26,17 @@ const DAYS = [
 
 const COLORS = ["#805af2", "#4D79FF", "#FF4D4D", "#22c55e", "#eab308", "#ec4899"];
 
+export interface ScheduleSlot {
+  day: string;
+  startTime: string;
+  endTime: string;
+}
+
 interface SubjectFormProps {
   initialData?: {
     _id?: string;
     name: string;
-    startTime: string;
-    endTime: string;
-    activeDays: string[];
+    slots: ScheduleSlot[];
     color: string;
   };
 }
@@ -42,22 +46,37 @@ export default function SubjectForm({ initialData }: SubjectFormProps) {
   const isEditing = !!initialData?._id;
 
   const [name, setName] = useState(initialData?.name || "");
-  const [startTime, setStartTime] = useState(initialData?.startTime || "09:00");
-  const [endTime, setEndTime] = useState(initialData?.endTime || "10:30");
-  const [activeDays, setActiveDays] = useState<string[]>(
-    initialData?.activeDays || ["Mon", "Wed", "Fri"]
+  const [slots, setSlots] = useState<ScheduleSlot[]>(
+    initialData?.slots?.length
+      ? initialData.slots
+      : [{ day: "Mon", startTime: "09:00", endTime: "10:30" }]
   );
   const [color, setColor] = useState(initialData?.color || "#805af2");
   const [isSubmitting, setIsSubmitting] = useState(false);
+  const [activeSlotIndex, setActiveSlotIndex] = useState(0);
 
-  const toggleDay = (day: string) => {
-    setActiveDays((prev) =>
-      prev.includes(day) ? prev.filter((d) => d !== day) : [...prev, day]
+  const addSlot = () => {
+    setSlots((prev) => [
+      ...prev,
+      { day: "Mon", startTime: "09:00", endTime: "10:30" },
+    ]);
+    setActiveSlotIndex(slots.length);
+  };
+
+  const removeSlot = (index: number) => {
+    if (slots.length <= 1) return;
+    setSlots((prev) => prev.filter((_, i) => i !== index));
+    setActiveSlotIndex(Math.max(0, activeSlotIndex - 1));
+  };
+
+  const updateSlot = (index: number, field: keyof ScheduleSlot, value: string) => {
+    setSlots((prev) =>
+      prev.map((slot, i) => (i === index ? { ...slot, [field]: value } : slot))
     );
   };
 
   const handleSubmit = async () => {
-    if (!name.trim() || activeDays.length === 0 || isSubmitting) return;
+    if (!name.trim() || slots.length === 0 || isSubmitting) return;
     setIsSubmitting(true);
 
     try {
@@ -69,7 +88,7 @@ export default function SubjectForm({ initialData }: SubjectFormProps) {
       const res = await fetch(url, {
         method,
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ name, startTime, endTime, activeDays, color }),
+        body: JSON.stringify({ name, slots, color }),
       });
 
       if (res.ok) {
@@ -85,11 +104,12 @@ export default function SubjectForm({ initialData }: SubjectFormProps) {
 
   const handleReset = () => {
     setName("");
-    setStartTime("09:00");
-    setEndTime("10:30");
-    setActiveDays(["Mon", "Wed", "Fri"]);
+    setSlots([{ day: "Mon", startTime: "09:00", endTime: "10:30" }]);
     setColor("#805af2");
+    setActiveSlotIndex(0);
   };
+
+  const currentSlot = slots[activeSlotIndex] || slots[0];
 
   return (
     <div className="relative flex h-full w-full flex-col max-w-md md:max-w-2xl mx-auto bg-[#0F0F11] overflow-hidden">
@@ -121,7 +141,7 @@ export default function SubjectForm({ initialData }: SubjectFormProps) {
       </header>
 
       {/* Form */}
-      <main className="flex-1 overflow-y-auto no-scrollbar relative z-10 px-6 py-6 space-y-10">
+      <main className="flex-1 overflow-y-auto no-scrollbar relative z-10 px-6 py-6 space-y-8">
         {/* Subject Input */}
         <div className="space-y-3">
           <label className="block text-xs font-mono text-gray-500 uppercase tracking-widest pl-2">
@@ -142,68 +162,111 @@ export default function SubjectForm({ initialData }: SubjectFormProps) {
           </div>
         </div>
 
-        {/* Time Dials */}
+        {/* Schedule Slots */}
         <div className="space-y-4">
           <div className="flex justify-between items-end px-2">
             <label className="block text-xs font-mono text-gray-500 uppercase tracking-widest">
-              Temporal Coordinates
+              Schedule Slots
             </label>
-            <span className="text-[10px] font-mono text-[#4D79FF] bg-[#4D79FF]/10 px-2 py-0.5 rounded border border-[#4D79FF]/30">
-              SYNC ACTIVE
-            </span>
+            <button
+              onClick={addSlot}
+              className="text-[10px] font-mono text-[#4D79FF] bg-[#4D79FF]/10 px-3 py-1 rounded border border-[#4D79FF]/30 hover:bg-[#4D79FF]/20 transition-colors"
+            >
+              + ADD SLOT
+            </button>
           </div>
-          <div className="grid grid-cols-2 gap-6 h-48">
-            <TimeDial
-              label="START"
-              dotColor="#4D79FF"
-              times={TIMES}
-              selectedTime={startTime}
-              onTimeChange={setStartTime}
-            />
-            <TimeDial
-              label="END"
-              dotColor="#FF4D4D"
-              times={TIMES}
-              selectedTime={endTime}
-              onTimeChange={setEndTime}
-            />
-          </div>
-        </div>
 
-        {/* Day Toggles */}
-        <div className="space-y-4">
-          <label className="block text-xs font-mono text-gray-500 uppercase tracking-widest pl-2">
-            Active Cycles
-          </label>
-          <div className="flex justify-between items-center p-2">
-            {DAYS.map((day) => {
-              const isActive = activeDays.includes(day.key);
-              return (
-                <button
-                  key={day.key}
-                  onClick={() => toggleDay(day.key)}
-                  className={`relative group w-11 h-11 rounded-full flex items-center justify-center transition-transform active:scale-95 ${
-                    isActive
-                      ? "bg-chrome-gradient shadow-chrome"
-                      : "bg-[#1a1a1f] shadow-plump-inset border border-white/5"
-                  }`}
-                >
+          {/* Slot Tabs */}
+          <div className="flex gap-2 overflow-x-auto no-scrollbar pb-1">
+            {slots.map((slot, i) => (
+              <button
+                key={i}
+                onClick={() => setActiveSlotIndex(i)}
+                className={`relative flex items-center gap-2 px-3 py-2 rounded-lg text-[10px] font-mono uppercase tracking-wider shrink-0 transition-all ${
+                  i === activeSlotIndex
+                    ? "bg-[#4D79FF]/20 text-[#4D79FF] border border-[#4D79FF]/40"
+                    : "bg-[rgba(255,255,255,0.05)] text-gray-500 border border-white/5 hover:border-white/10"
+                }`}
+              >
+                <span>{slot.day}</span>
+                <span className="text-[8px] text-gray-600">
+                  {slot.startTime}-{slot.endTime}
+                </span>
+                {slots.length > 1 && (
                   <span
-                    className={`font-bold z-10 ${
-                      isActive ? "text-gray-800" : "text-gray-600 group-hover:text-gray-400"
+                    onClick={(e) => {
+                      e.stopPropagation();
+                      removeSlot(i);
+                    }}
+                    className="ml-1 text-gray-600 hover:text-red-400 cursor-pointer"
+                  >
+                    ×
+                  </span>
+                )}
+              </button>
+            ))}
+          </div>
+
+          {/* Active Slot Day Selector */}
+          <div className="space-y-3">
+            <label className="block text-[10px] font-mono text-gray-600 uppercase tracking-widest pl-2">
+              Day for Slot {activeSlotIndex + 1}
+            </label>
+            <div className="flex justify-between items-center p-2">
+              {DAYS.map((day) => {
+                const isActive = currentSlot?.day === day.key;
+                return (
+                  <button
+                    key={day.key}
+                    onClick={() => updateSlot(activeSlotIndex, "day", day.key)}
+                    className={`relative group w-11 h-11 rounded-full flex items-center justify-center transition-transform active:scale-95 ${
+                      isActive
+                        ? "bg-chrome-gradient shadow-chrome"
+                        : "bg-[#1a1a1f] shadow-plump-inset border border-white/5"
                     }`}
                   >
-                    {day.label}
-                  </span>
-                  {isActive && (
-                    <>
-                      <div className="absolute -top-1 right-0 w-2 h-2 rounded-full bg-[#4D79FF] shadow-[0_0_10px_rgba(77,121,255,0.6)] border border-white/40" />
-                      <div className="absolute inset-0 rounded-full bg-gradient-to-br from-white/80 to-transparent opacity-50 pointer-events-none" />
-                    </>
-                  )}
-                </button>
-              );
-            })}
+                    <span
+                      className={`font-bold z-10 ${
+                        isActive
+                          ? "text-gray-800"
+                          : "text-gray-600 group-hover:text-gray-400"
+                      }`}
+                    >
+                      {day.label}
+                    </span>
+                    {isActive && (
+                      <>
+                        <div className="absolute -top-1 right-0 w-2 h-2 rounded-full bg-[#4D79FF] shadow-[0_0_10px_rgba(77,121,255,0.6)] border border-white/40" />
+                        <div className="absolute inset-0 rounded-full bg-gradient-to-br from-white/80 to-transparent opacity-50 pointer-events-none" />
+                      </>
+                    )}
+                  </button>
+                );
+              })}
+            </div>
+          </div>
+
+          {/* Active Slot Time Dials */}
+          <div className="space-y-3">
+            <label className="block text-[10px] font-mono text-gray-600 uppercase tracking-widest pl-2">
+              Time for Slot {activeSlotIndex + 1}
+            </label>
+            <div className="grid grid-cols-2 gap-6 h-48">
+              <TimeDial
+                label="START"
+                dotColor="#4D79FF"
+                times={TIMES}
+                selectedTime={currentSlot?.startTime || "09:00"}
+                onTimeChange={(t) => updateSlot(activeSlotIndex, "startTime", t)}
+              />
+              <TimeDial
+                label="END"
+                dotColor="#FF4D4D"
+                times={TIMES}
+                selectedTime={currentSlot?.endTime || "10:30"}
+                onTimeChange={(t) => updateSlot(activeSlotIndex, "endTime", t)}
+              />
+            </div>
           </div>
         </div>
 
@@ -234,7 +297,7 @@ export default function SubjectForm({ initialData }: SubjectFormProps) {
       <div className="absolute bottom-20 md:bottom-24 left-0 w-full px-6 pb-2 bg-gradient-to-t from-[#0F0F11] via-[#0F0F11]/95 to-transparent z-20">
         <button
           onClick={handleSubmit}
-          disabled={!name.trim() || activeDays.length === 0 || isSubmitting}
+          disabled={!name.trim() || slots.length === 0 || isSubmitting}
           className="group relative w-full h-16 rounded-2xl bg-[#1a1a1f] border border-white/10 shadow-plump flex items-center justify-between px-2 overflow-hidden transition-transform active:scale-[0.98] disabled:opacity-50 disabled:cursor-not-allowed cursor-pointer"
         >
           <div className="absolute inset-0 bg-gradient-to-r from-[#4D79FF]/20 to-[#805af2]/20 opacity-0 group-hover:opacity-100 transition-opacity duration-300" />

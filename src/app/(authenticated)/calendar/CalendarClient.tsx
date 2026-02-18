@@ -2,13 +2,25 @@
 
 import BrushedSteelHeader from "@/components/ui/BrushedSteelHeader";
 import { GlassIconButton } from "@/components/ui/Icons";
-import { format, startOfMonth, endOfMonth, addMonths, subMonths } from "date-fns";
+import { addMonths, endOfMonth, format, startOfMonth, subMonths } from "date-fns";
 import { AnimatePresence, motion } from "framer-motion";
 import { useCallback, useEffect, useState } from "react";
 import CalendarGrid from "./CalendarGrid";
 import DayDetailSheet from "./DayDetailSheet";
 import MonthlyStats from "./MonthlyStats";
 import SubjectBreakdown from "./SubjectBreakdown";
+
+export interface ScheduleSlot {
+  day: string;
+  startTime: string;
+  endTime: string;
+}
+
+export interface ScheduleEntry {
+  slots: ScheduleSlot[];
+  effectiveFrom: string;
+  effectiveTo: string | null;
+}
 
 export interface AttendanceRecord {
   _id: string;
@@ -19,10 +31,33 @@ export interface AttendanceRecord {
     _id: string;
     name: string;
     color: string;
-    startTime: string;
-    endTime: string;
-    activeDays: string[];
+    schedules: ScheduleEntry[];
   } | string;
+}
+
+const DAY_NAMES = ["Sun", "Mon", "Tue", "Wed", "Thu", "Fri", "Sat"];
+
+/** Get the matching time slot for a subject on a specific date from its schedule history */
+export function getSlotForDate(
+  schedules: ScheduleEntry[],
+  date: Date
+): ScheduleSlot | null {
+  const dayName = DAY_NAMES[date.getDay()];
+  const d = new Date(date);
+  d.setHours(0, 0, 0, 0);
+
+  for (const entry of schedules) {
+    const from = new Date(entry.effectiveFrom);
+    from.setHours(0, 0, 0, 0);
+    const to = entry.effectiveTo ? new Date(entry.effectiveTo) : null;
+    if (to) to.setHours(23, 59, 59, 999);
+
+    if (d >= from && (!to || d <= to)) {
+      const slot = entry.slots.find((s) => s.day === dayName);
+      if (slot) return slot;
+    }
+  }
+  return null;
 }
 
 export interface DayData {

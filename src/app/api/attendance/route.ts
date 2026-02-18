@@ -2,7 +2,7 @@ import { auth } from "@/lib/auth";
 import { connectDB } from "@/lib/db/connection";
 import AttendanceRecord from "@/lib/db/models/AttendanceRecord";
 import User from "@/lib/db/models/User";
-import { awardXP, XP_ATTENDANCE_MARK } from "@/lib/gamification";
+import { awardXP, reverseXP, XP_ATTENDANCE_MARK } from "@/lib/gamification";
 import { updateStreak } from "@/lib/streak";
 import { NextRequest, NextResponse } from "next/server";
 
@@ -29,7 +29,7 @@ export async function GET(req: NextRequest) {
     const records = await AttendanceRecord.find({
       userId: session.user.id,
       date: { $gte: startDate, $lte: endDate },
-    }).populate("subjectId", "name color startTime endTime activeDays");
+    }).populate("subjectId", "name color schedules");
 
     return NextResponse.json({ records });
   }
@@ -47,7 +47,7 @@ export async function GET(req: NextRequest) {
   return NextResponse.json({ records });
 }
 
-// POST /api/attendance — mark attendance for a subject
+// POST /api/attendance — mark attendance for a subject (toggleable)
 export async function POST(req: NextRequest) {
   const session = await auth();
   if (!session?.user?.id) {
@@ -74,13 +74,23 @@ export async function POST(req: NextRequest) {
   });
 
   if (existing) {
-    // Toggle off if same status, otherwise update
+    // Toggle off if same status
     if (existing.status === status) {
+      const xpToReverse = existing.xpEarned || 0;
       await AttendanceRecord.deleteOne({ _id: existing._id });
-      // Decrement attendance count
-      await User.findByIdAndUpdate(session.user.id, {
-        $inc: { totalAttendanceDays: -1 },
-      });
+
+      // Reverse stats
+      const updates: Record<string, number> = { totalScheduledDays: -1 };
+      if (existing.status === "present") {
+        updates.totalAttendanceDays = -1;
+      }
+      await User.findByIdAndUpdate(session.user.id, { $inc: updates });
+
+      // Reverse XP if any was earned
+      if (xpToReverse > 0) {
+        await reverseXP(session.user.id, xpToReverse);
+      }
+
       return NextResponse.json({ action: "removed", record: null });
     }
     // Update status
@@ -100,16 +110,23 @@ export async function POST(req: NextRequest) {
     xpEarned,
   });
 
-  // Award XP and update streak
-  if (status === "present") {
+  // Award XP for attendance
+  if (xpEarned > 0) {
     await awardXP(session.user.id, xpEarned);
+  }
+
+  // Update streak (no side effects — only returns info)
+  if (status === "present") {
     const streakResult = await updateStreak(session.user.id);
     if (streakResult.streakBonus > 0) {
       await awardXP(session.user.id, streakResult.streakBonus);
+      // Update xpEarned on record to include streak bonus for accurate reversal
+      record.xpEarned = xpEarned + streakResult.streakBonus;
+      await record.save();
     }
   }
 
-  // Update totalScheduledDays and totalAttendanceDays
+  // Update totalScheduledDays and totalAttendanceDays (single place, no duplication)
   await User.findByIdAndUpdate(session.user.id, {
     $inc: {
       totalScheduledDays: 1,
@@ -118,4 +135,53 @@ export async function POST(req: NextRequest) {
   });
 
   return NextResponse.json({ action: "created", record }, { status: 201 });
+}
+
+// DELETE /api/attendance — remove a specific attendance record
+export async function DELETE(req: NextRequest) {
+  const session = await auth();
+  if (!session?.user?.id) {
+    return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
+  }
+
+  const { searchParams } = req.nextUrl;
+  const subjectId = searchParams.get("subjectId");
+
+  if (!subjectId) {
+    return NextResponse.json({ error: "Missing subjectId" }, { status: 400 });
+  }
+
+  const today = new Date();
+  today.setHours(0, 0, 0, 0);
+
+  await connectDB();
+
+  const existing = await AttendanceRecord.findOne({
+    userId: session.user.id,
+    subjectId,
+    date: today,
+  });
+
+  if (!existing) {
+    return NextResponse.json({ error: "No record found" }, { status: 404 });
+  }
+
+  const xpToReverse = existing.xpEarned || 0;
+  const wasPresent = existing.status === "present";
+
+  await AttendanceRecord.deleteOne({ _id: existing._id });
+
+  // Reverse stats
+  const updates: Record<string, number> = { totalScheduledDays: -1 };
+  if (wasPresent) {
+    updates.totalAttendanceDays = -1;
+  }
+  await User.findByIdAndUpdate(session.user.id, { $inc: updates });
+
+  // Reverse XP
+  if (xpToReverse > 0) {
+    await reverseXP(session.user.id, xpToReverse);
+  }
+
+  return NextResponse.json({ action: "removed", record: null });
 }

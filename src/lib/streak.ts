@@ -1,6 +1,6 @@
 import { connectDB } from "@/lib/db/connection";
 import User from "@/lib/db/models/User";
-import { awardXP, getStreakBonus } from "@/lib/gamification";
+import { getStreakBonus } from "@/lib/gamification";
 
 function isSameDay(d1: Date, d2: Date): boolean {
   return (
@@ -16,6 +16,10 @@ function isYesterday(d1: Date, d2: Date): boolean {
   return isSameDay(d1, yesterday);
 }
 
+/**
+ * Updates user streak info. DOES NOT award XP or increment totalAttendanceDays.
+ * Returns streak info + bonus amount for the caller to handle.
+ */
 export async function updateStreak(userId: string): Promise<{
   currentStreak: number;
   longestStreak: number;
@@ -32,7 +36,6 @@ export async function updateStreak(userId: string): Promise<{
   today.setHours(0, 0, 0, 0);
 
   let newStreak = user.currentStreak;
-  let streakBonus = 0;
 
   if (user.lastAttendanceDate) {
     const lastDate = new Date(user.lastAttendanceDate);
@@ -46,31 +49,22 @@ export async function updateStreak(userId: string): Promise<{
         streakBonus: 0,
       };
     } else if (isYesterday(lastDate, today)) {
-      // Consecutive day — increment streak
       newStreak = user.currentStreak + 1;
     } else {
-      // Gap detected — reset streak
       newStreak = 1;
     }
   } else {
-    // First ever attendance
     newStreak = 1;
   }
 
   const newLongestStreak = Math.max(user.longestStreak, newStreak);
-  streakBonus = getStreakBonus(newStreak);
+  const streakBonus = getStreakBonus(newStreak);
 
-  if (streakBonus > 0) {
-    await awardXP(userId, streakBonus);
-  }
-
+  // Only update streak fields — no XP, no totalAttendanceDays
   await User.findByIdAndUpdate(userId, {
     currentStreak: newStreak,
     longestStreak: newLongestStreak,
     lastAttendanceDate: today,
-    $inc: {
-      totalAttendanceDays: 1,
-    },
   });
 
   return {

@@ -25,6 +25,7 @@ export async function GET(
 }
 
 // PUT /api/subjects/[id] — update a subject
+// If schedule (slots) changes, archives old schedule and creates new one
 export async function PUT(
   req: NextRequest,
   { params }: { params: Promise<{ id: string }> }
@@ -36,26 +37,44 @@ export async function PUT(
 
   const { id } = await params;
   const body = await req.json();
-  const { name, startTime, endTime, activeDays, color, isActive } = body;
+  const { name, slots, color, isActive } = body;
 
   await connectDB();
-  const subject = await Subject.findOneAndUpdate(
-    { _id: id, userId: session.user.id },
-    {
-      ...(name !== undefined && { name }),
-      ...(startTime !== undefined && { startTime }),
-      ...(endTime !== undefined && { endTime }),
-      ...(activeDays !== undefined && { activeDays }),
-      ...(color !== undefined && { color }),
-      ...(isActive !== undefined && { isActive }),
-    },
-    { new: true }
-  );
+  const subject = await Subject.findOne({ _id: id, userId: session.user.id });
 
   if (!subject) {
     return NextResponse.json({ error: "Subject not found" }, { status: 404 });
   }
 
+  // Update simple fields
+  if (name !== undefined) subject.name = name;
+  if (color !== undefined) subject.color = color;
+  if (isActive !== undefined) subject.isActive = isActive;
+
+  // Handle schedule change — archive old, create new
+  if (slots && Array.isArray(slots) && slots.length > 0) {
+    const today = new Date();
+    today.setHours(0, 0, 0, 0);
+
+    // Find the current active schedule and archive it
+    const currentScheduleIdx = subject.schedules.findIndex(
+      (s) => s.effectiveTo === null
+    );
+    if (currentScheduleIdx >= 0) {
+      const yesterday = new Date(today);
+      yesterday.setDate(yesterday.getDate() - 1);
+      subject.schedules[currentScheduleIdx].effectiveTo = yesterday;
+    }
+
+    // Add new schedule entry
+    subject.schedules.push({
+      slots,
+      effectiveFrom: today,
+      effectiveTo: null,
+    });
+  }
+
+  await subject.save();
   return NextResponse.json({ subject });
 }
 

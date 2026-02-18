@@ -1,15 +1,15 @@
 "use client";
 
 import {
-  startOfMonth,
-  endOfMonth,
-  startOfWeek,
-  endOfWeek,
-  eachDayOfInterval,
-  isSameMonth,
-  isSameDay,
-  isToday,
-  format,
+    eachDayOfInterval,
+    endOfMonth,
+    endOfWeek,
+    format,
+    isSameDay,
+    isSameMonth,
+    isToday,
+    startOfMonth,
+    startOfWeek,
 } from "date-fns";
 import { AnimatePresence, motion } from "framer-motion";
 import type { AttendanceRecord, DayData } from "./CalendarClient";

@@ -2,14 +2,14 @@ import { auth } from "@/lib/auth";
 import { connectDB } from "@/lib/db/connection";
 import AttendanceRecord from "@/lib/db/models/AttendanceRecord";
 import FocusSession from "@/lib/db/models/FocusSession";
-import Subject from "@/lib/db/models/Subject";
+import Subject, { getScheduleForDate, IScheduleEntry, IScheduleSlot } from "@/lib/db/models/Subject";
 import User from "@/lib/db/models/User";
 import {
-  startOfMonth,
-  endOfMonth,
-  eachDayOfInterval,
-  getDay,
-  format,
+    eachDayOfInterval,
+    endOfMonth,
+    format,
+    getDay,
+    startOfMonth,
 } from "date-fns";
 import { NextRequest, NextResponse } from "next/server";
 
@@ -22,6 +22,20 @@ const DAY_MAP: Record<number, string> = {
   5: "Fri",
   6: "Sat",
 };
+
+/**
+ * Check if a subject was scheduled on a given date, using its schedule history.
+ * Returns the matching slots for that day, or empty array if not scheduled.
+ */
+function getSlotsForDate(
+  schedules: IScheduleEntry[],
+  date: Date,
+  dayName: string
+): IScheduleSlot[] {
+  const schedule = getScheduleForDate(schedules, date);
+  if (!schedule) return [];
+  return schedule.slots.filter((s) => s.day === dayName);
+}
 
 // GET /api/attendance/monthly-stats?month=1&year=2026
 export async function GET(req: NextRequest) {
@@ -48,14 +62,14 @@ export async function GET(req: NextRequest) {
 
   await connectDB();
 
-  // Fetch all data in parallel
+  // Fetch all data in parallel — include inactive subjects for historical accuracy
   const [attendanceRecords, focusSessions, subjects, user] = await Promise.all(
     [
       AttendanceRecord.find({
         userId: session.user.id,
         date: { $gte: monthStart, $lte: monthEnd },
       })
-        .populate("subjectId", "name color")
+        .populate("subjectId", "name color schedules")
         .lean(),
 
       FocusSession.find({
@@ -64,9 +78,9 @@ export async function GET(req: NextRequest) {
         completedAt: { $gte: monthStart, $lte: monthEnd },
       }).lean(),
 
+      // Include all subjects (active AND inactive) for historical stats
       Subject.find({
         userId: session.user.id,
-        isActive: true,
       }).lean(),
 
       User.findById(session.user.id)
@@ -81,44 +95,51 @@ export async function GET(req: NextRequest) {
     end: monthEnd,
   });
 
-  // Build subject breakdown: for each subject, how many scheduled days are in this month, and how many present/absent/late
-  const subjectBreakdown = subjects.map((subject) => {
-    const activeDaysSet = new Set(subject.activeDays);
+  // Build subject breakdown using schedule history
+  const subjectBreakdown = subjects
+    .filter((s) => s.isActive || attendanceRecords.some(
+      (r: any) => (r.subjectId?._id?.toString() || r.subjectId?.toString()) === s._id.toString()
+    ))
+    .map((subject) => {
+      // Count scheduled days for this subject this month using schedule history
+      let scheduledDays = 0;
+      for (const day of daysInMonth) {
+        const dayName = DAY_MAP[getDay(day)];
+        const slots = getSlotsForDate(subject.schedules || [], day, dayName);
+        if (slots.length > 0) scheduledDays++;
+      }
 
-    // Count scheduled days this month for this subject
-    const scheduledDays = daysInMonth.filter((day) =>
-      activeDaysSet.has(DAY_MAP[getDay(day)])
-    ).length;
+      // Count attendance statuses
+      const subjectRecords = attendanceRecords.filter(
+        (r: any) =>
+          r.subjectId?._id?.toString() === subject._id.toString() ||
+          r.subjectId?.toString() === subject._id.toString()
+      );
 
-    // Count attendance statuses for this subject this month
-    const subjectRecords = attendanceRecords.filter(
-      (r: any) =>
-        r.subjectId?._id?.toString() === subject._id.toString() ||
-        r.subjectId?.toString() === subject._id.toString()
-    );
+      const present = subjectRecords.filter(
+        (r: any) => r.status === "present"
+      ).length;
+      const absent = subjectRecords.filter(
+        (r: any) => r.status === "absent"
+      ).length;
+      const late = subjectRecords.filter(
+        (r: any) => r.status === "late"
+      ).length;
 
-    const present = subjectRecords.filter(
-      (r: any) => r.status === "present"
-    ).length;
-    const absent = subjectRecords.filter(
-      (r: any) => r.status === "absent"
-    ).length;
-    const late = subjectRecords.filter(
-      (r: any) => r.status === "late"
-    ).length;
+      return {
+        _id: subject._id.toString(),
+        name: subject.name,
+        color: subject.color,
+        scheduledDays,
+        present,
+        absent,
+        late,
+        isActive: subject.isActive,
+      };
+    })
+    .filter((s) => s.scheduledDays > 0 || s.present > 0 || s.absent > 0 || s.late > 0);
 
-    return {
-      _id: subject._id.toString(),
-      name: subject.name,
-      color: subject.color,
-      scheduledDays,
-      present,
-      absent,
-      late,
-    };
-  });
-
-  // Calculate overall attendance rate for the month
+  // Calculate overall attendance rate
   const totalScheduled = subjectBreakdown.reduce(
     (sum, s) => sum + s.scheduledDays,
     0
@@ -157,9 +178,12 @@ export async function GET(req: NextRequest) {
     const dayKey = format(day, "yyyy-MM-dd");
     const dayName = DAY_MAP[getDay(day)];
 
-    const scheduledCount = subjects.filter((s) =>
-      s.activeDays.includes(dayName)
-    ).length;
+    // Count scheduled subjects for this day using schedule history
+    let scheduledCount = 0;
+    for (const subject of subjects) {
+      const slots = getSlotsForDate(subject.schedules || [], day, dayName);
+      if (slots.length > 0) scheduledCount++;
+    }
 
     const dayRecords = attendanceRecords.filter(
       (r: any) =>
