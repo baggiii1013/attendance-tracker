@@ -30,10 +30,11 @@ export default async function EditSubjectPage({ params }: Props) {
   const slots = currentSchedule
     ? currentSchedule.slots.map((s: IScheduleSlot) => ({
         day: s.day,
-        startTime: s.startTime,
-        endTime: s.endTime,
+        sessionNumber: s.sessionNumber || 1,
+        ...(s.startTime ? { startTime: s.startTime } : {}),
+        ...(s.endTime ? { endTime: s.endTime } : {}),
       }))
-    : [{ day: "Mon", startTime: "09:00", endTime: "10:30" }];
+    : [{ day: "Mon", sessionNumber: 1 }];
 
   return (
     <SubjectForm

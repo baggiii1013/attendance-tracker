@@ -38,15 +38,53 @@ export async function POST(req: NextRequest) {
 
   // Validate slots structure
   for (const slot of slots) {
-    if (!slot.day || !slot.startTime || !slot.endTime) {
+    if (!slot.day || typeof slot.sessionNumber !== "number") {
       return NextResponse.json(
-        { error: "Each slot must have day, startTime, and endTime" },
+        { error: "Each slot must have day and sessionNumber" },
         { status: 400 }
       );
     }
   }
 
+  // Check for duplicate (day, sessionNumber) within the new subject
+  const slotKeys = slots.map(
+    (s: any) => `${s.day}-${s.sessionNumber}`
+  );
+  if (new Set(slotKeys).size !== slotKeys.length) {
+    return NextResponse.json(
+      { error: "Duplicate day+sessionNumber combination in slots" },
+      { status: 400 }
+    );
+  }
+
   await connectDB();
+
+  // Check for conflicts with existing subjects (same user, same day+session)
+  const existingSubjects = await Subject.find({
+    userId: session.user.id,
+    isActive: true,
+  }).lean();
+
+  for (const slot of slots) {
+    for (const existing of existingSubjects) {
+      const currentSchedule = (existing.schedules || []).find(
+        (s: any) => s.effectiveTo === null
+      );
+      if (!currentSchedule) continue;
+      const conflict = currentSchedule.slots.find(
+        (s: any) =>
+          s.day === slot.day && s.sessionNumber === slot.sessionNumber
+      );
+      if (conflict) {
+        return NextResponse.json(
+          {
+            error: `Session ${slot.sessionNumber} on ${slot.day} is already assigned to "${existing.name}"`,
+          },
+          { status: 409 }
+        );
+      }
+    }
+  }
 
   const subject = await Subject.create({
     userId: session.user.id,

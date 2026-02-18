@@ -55,10 +55,10 @@ export async function POST(req: NextRequest) {
   }
 
   const body = await req.json();
-  const { subjectId, status } = body;
+  const { subjectId, status, sessionNumber } = body;
 
-  if (!subjectId || !status) {
-    return NextResponse.json({ error: "Missing subjectId or status" }, { status: 400 });
+  if (!subjectId || !status || !sessionNumber) {
+    return NextResponse.json({ error: "Missing subjectId, status, or sessionNumber" }, { status: 400 });
   }
 
   const today = new Date();
@@ -71,6 +71,7 @@ export async function POST(req: NextRequest) {
     userId: session.user.id,
     subjectId,
     date: today,
+    sessionNumber,
   });
 
   if (existing) {
@@ -105,6 +106,7 @@ export async function POST(req: NextRequest) {
     userId: session.user.id,
     subjectId,
     date: today,
+    sessionNumber,
     status,
     markedAt: new Date(),
     xpEarned,
@@ -146,10 +148,13 @@ export async function DELETE(req: NextRequest) {
 
   const { searchParams } = req.nextUrl;
   const subjectId = searchParams.get("subjectId");
+  const sessionNumberParam = searchParams.get("sessionNumber");
 
-  if (!subjectId) {
-    return NextResponse.json({ error: "Missing subjectId" }, { status: 400 });
+  if (!subjectId || !sessionNumberParam) {
+    return NextResponse.json({ error: "Missing subjectId or sessionNumber" }, { status: 400 });
   }
+
+  const sessionNumber = parseInt(sessionNumberParam, 10);
 
   const today = new Date();
   today.setHours(0, 0, 0, 0);
@@ -160,6 +165,7 @@ export async function DELETE(req: NextRequest) {
     userId: session.user.id,
     subjectId,
     date: today,
+    sessionNumber,
   });
 
   if (!existing) {

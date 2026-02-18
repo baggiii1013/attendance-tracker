@@ -2,8 +2,9 @@ import mongoose, { Document, Model, Schema } from "mongoose";
 
 export interface IScheduleSlot {
   day: string;
-  startTime: string;
-  endTime: string;
+  sessionNumber: number;
+  startTime?: string;
+  endTime?: string;
 }
 
 export interface IScheduleEntry {
@@ -34,8 +35,9 @@ const ScheduleSlotSchema = new Schema<IScheduleSlot>(
       required: true,
       enum: ["Mon", "Tue", "Wed", "Thu", "Fri", "Sat", "Sun"],
     },
-    startTime: { type: String, required: true },
-    endTime: { type: String, required: true },
+    sessionNumber: { type: Number, required: true, min: 1 },
+    startTime: { type: String },
+    endTime: { type: String },
   },
   { _id: false }
 );

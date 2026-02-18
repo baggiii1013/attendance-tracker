@@ -5,11 +5,11 @@ import FocusSession from "@/lib/db/models/FocusSession";
 import Subject, { getScheduleForDate, IScheduleEntry, IScheduleSlot } from "@/lib/db/models/Subject";
 import User from "@/lib/db/models/User";
 import {
-    eachDayOfInterval,
-    endOfMonth,
-    format,
-    getDay,
-    startOfMonth,
+  eachDayOfInterval,
+  endOfMonth,
+  format,
+  getDay,
+  startOfMonth,
 } from "date-fns";
 import { NextRequest, NextResponse } from "next/server";
 
@@ -101,12 +101,12 @@ export async function GET(req: NextRequest) {
       (r: any) => (r.subjectId?._id?.toString() || r.subjectId?.toString()) === s._id.toString()
     ))
     .map((subject) => {
-      // Count scheduled days for this subject this month using schedule history
-      let scheduledDays = 0;
+      // Count scheduled sessions for this subject this month using schedule history
+      let scheduledSessions = 0;
       for (const day of daysInMonth) {
         const dayName = DAY_MAP[getDay(day)];
         const slots = getSlotsForDate(subject.schedules || [], day, dayName);
-        if (slots.length > 0) scheduledDays++;
+        scheduledSessions += slots.length; // count each slot as a session
       }
 
       // Count attendance statuses
@@ -130,7 +130,7 @@ export async function GET(req: NextRequest) {
         _id: subject._id.toString(),
         name: subject.name,
         color: subject.color,
-        scheduledDays,
+        scheduledDays: scheduledSessions,
         present,
         absent,
         late,
@@ -178,11 +178,11 @@ export async function GET(req: NextRequest) {
     const dayKey = format(day, "yyyy-MM-dd");
     const dayName = DAY_MAP[getDay(day)];
 
-    // Count scheduled subjects for this day using schedule history
+    // Count total scheduled sessions for this day using schedule history
     let scheduledCount = 0;
     for (const subject of subjects) {
       const slots = getSlotsForDate(subject.schedules || [], day, dayName);
-      if (slots.length > 0) scheduledCount++;
+      scheduledCount += slots.length; // each slot is a session
     }
 
     const dayRecords = attendanceRecords.filter(

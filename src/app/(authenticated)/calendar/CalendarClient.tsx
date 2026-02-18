@@ -12,8 +12,9 @@ import SubjectBreakdown from "./SubjectBreakdown";
 
 export interface ScheduleSlot {
   day: string;
-  startTime: string;
-  endTime: string;
+  sessionNumber: number;
+  startTime?: string;
+  endTime?: string;
 }
 
 export interface ScheduleEntry {
@@ -27,6 +28,7 @@ export interface AttendanceRecord {
   date: string;
   status: "present" | "absent" | "late";
   xpEarned: number;
+  sessionNumber?: number;
   subjectId: {
     _id: string;
     name: string;
@@ -37,11 +39,11 @@ export interface AttendanceRecord {
 
 const DAY_NAMES = ["Sun", "Mon", "Tue", "Wed", "Thu", "Fri", "Sat"];
 
-/** Get the matching time slot for a subject on a specific date from its schedule history */
-export function getSlotForDate(
+/** Get ALL matching time slots for a subject on a specific date from its schedule history */
+export function getSlotsForDate(
   schedules: ScheduleEntry[],
   date: Date
-): ScheduleSlot | null {
+): ScheduleSlot[] {
   const dayName = DAY_NAMES[date.getDay()];
   const d = new Date(date);
   d.setHours(0, 0, 0, 0);
@@ -53,11 +55,19 @@ export function getSlotForDate(
     if (to) to.setHours(23, 59, 59, 999);
 
     if (d >= from && (!to || d <= to)) {
-      const slot = entry.slots.find((s) => s.day === dayName);
-      if (slot) return slot;
+      return entry.slots.filter((s) => s.day === dayName);
     }
   }
-  return null;
+  return [];
+}
+
+/** Legacy single-slot helper (returns first match) */
+export function getSlotForDate(
+  schedules: ScheduleEntry[],
+  date: Date
+): ScheduleSlot | null {
+  const slots = getSlotsForDate(schedules, date);
+  return slots.length > 0 ? slots[0] : null;
 }
 
 export interface DayData {

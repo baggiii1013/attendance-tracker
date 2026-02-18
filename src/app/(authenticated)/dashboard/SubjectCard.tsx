@@ -2,176 +2,151 @@
 
 import AcrylicBlock from "@/components/ui/AcrylicBlock";
 import ChromeToggle from "@/components/ui/ChromeToggle";
-import LedStrip from "@/components/ui/LedStrip";
+import { MaterialIcon } from "@/components/ui/Icons";
 import { useRouter } from "next/navigation";
 import { useCallback, useState } from "react";
 
-interface ScheduleSlot {
-  day: string;
-  startTime: string;
-  endTime: string;
-}
-
-interface SubjectProps {
-  subject: {
-    _id: string;
-    name: string;
-    slots: ScheduleSlot[];
-    displayTime: string;
-    color: string;
-    isScheduledToday: boolean;
-    sessionStatus: "active" | "upcoming" | "completed" | "inactive";
+interface SessionSlotProps {
+  session: {
+    sessionNumber: number;
+    subject: {
+      _id: string;
+      name: string;
+      color: string;
+      startTime?: string;
+      endTime?: string;
+    } | null;
     attendanceMarked: boolean;
     attendanceStatus: string | null;
   };
 }
 
-export default function SubjectCard({ subject }: SubjectProps) {
+export default function SessionSlotCard({ session }: SessionSlotProps) {
   const router = useRouter();
   const [isMarking, setIsMarking] = useState(false);
-  const [optimisticMarked, setOptimisticMarked] = useState(subject.attendanceMarked);
+  const [optimisticMarked, setOptimisticMarked] = useState(
+    session.attendanceMarked
+  );
 
-  const statusConfig = {
-    active: {
-      dotColor: "bg-green-500 shadow-led-green",
-      label: "LIVE SESSION",
-      labelColor: "text-green-400",
-      borderColor: "#22c55e",
-    },
-    upcoming: {
-      dotColor: "bg-yellow-500 shadow-led-red",
-      label: `${subject.displayTime.split(" — ")[0]} - PENDING`,
-      labelColor: "text-gray-400",
-      borderColor: undefined,
-    },
-    completed: {
-      dotColor: "bg-gray-600",
-      label: `${subject.displayTime.split(" — ")[1] || ""} - DONE`,
-      labelColor: "text-gray-500",
-      borderColor: undefined,
-    },
-    inactive: {
-      dotColor: "bg-gray-600",
-      label: "NOT TODAY",
-      labelColor: "text-gray-500",
-      borderColor: undefined,
-    },
-  };
-
-  const config = statusConfig[subject.sessionStatus];
+  const isFree = session.subject === null;
+  const isMarked = optimisticMarked;
 
   const handleToggleAttendance = useCallback(
     async (markPresent: boolean) => {
-      if (isMarking) return;
+      if (isMarking || isFree || !session.subject) return;
       setIsMarking(true);
       setOptimisticMarked(markPresent);
 
       try {
         if (markPresent) {
-          // Mark as present
           const res = await fetch("/api/attendance", {
             method: "POST",
             headers: { "Content-Type": "application/json" },
             body: JSON.stringify({
-              subjectId: subject._id,
+              subjectId: session.subject._id,
               status: "present",
+              sessionNumber: session.sessionNumber,
             }),
           });
           if (!res.ok) {
-            setOptimisticMarked(false); // revert on failure
+            setOptimisticMarked(false);
           }
         } else {
-          // Un-mark attendance
           const res = await fetch(
-            `/api/attendance?subjectId=${subject._id}`,
+            `/api/attendance?subjectId=${session.subject._id}&sessionNumber=${session.sessionNumber}`,
             { method: "DELETE" }
           );
           if (!res.ok) {
-            setOptimisticMarked(true); // revert on failure
+            setOptimisticMarked(true);
           }
         }
         router.refresh();
       } catch (error) {
         console.error("Failed to toggle attendance:", error);
-        setOptimisticMarked(!markPresent); // revert on error
+        setOptimisticMarked(!markPresent);
       } finally {
         setIsMarking(false);
       }
     },
-    [isMarking, subject._id, router]
+    [isMarking, isFree, session.subject, session.sessionNumber, router]
   );
 
-  // Use optimistic state for display
-  const isMarked = optimisticMarked;
+  // Free session slot
+  if (isFree) {
+    return (
+      <AcrylicBlock className="p-0 overflow-hidden opacity-50">
+        <div className="px-5 py-3 flex items-center gap-4">
+          {/* Session Number */}
+          <div className="w-8 h-8 rounded-lg bg-[#111] border border-[#333] flex items-center justify-center shrink-0">
+            <span className="text-xs font-mono font-bold text-gray-600">
+              {session.sessionNumber}
+            </span>
+          </div>
 
-  const stabilityPercent = isMarked
-    ? 95
-    : subject.sessionStatus === "active"
-      ? 85
-      : 70;
-  const ledCount = Math.round((stabilityPercent / 100) * 10);
-  const ledColor =
-    stabilityPercent >= 80
-      ? "green"
-      : stabilityPercent >= 50
-        ? "yellow"
-        : "red";
+          {/* Free Label */}
+          <div className="flex-1">
+            <span className="text-sm font-mono text-gray-600 uppercase tracking-wider">
+              Free Period
+            </span>
+          </div>
+
+          {/* Dimmed status */}
+          <span className="text-[9px] font-mono text-gray-700 uppercase">
+            N/A
+          </span>
+        </div>
+      </AcrylicBlock>
+    );
+  }
+
+  const subject = session.subject!;
 
   return (
     <AcrylicBlock
       className="p-0 overflow-hidden group"
-      borderColor={config.borderColor}
+      borderColor={isMarked ? "#22c55e" : undefined}
     >
-      {/* Status Bar */}
-      <div className="bg-[#151518] px-5 py-3 border-b border-white/5 flex justify-between items-center">
-        <div className="flex items-center gap-2">
-          <div
-            className={`w-1.5 h-1.5 rounded-full ${config.dotColor} ${subject.sessionStatus === "active" ? "animate-pulse" : ""}`}
-          />
+      <div className="px-5 py-3 flex items-center gap-4">
+        {/* Session Number */}
+        <div
+          className="w-8 h-8 rounded-lg flex items-center justify-center shrink-0 border"
+          style={{
+            backgroundColor: `${subject.color}15`,
+            borderColor: `${subject.color}40`,
+          }}
+        >
           <span
-            className={`text-[10px] font-mono tracking-wider ${config.labelColor}`}
+            className="text-xs font-mono font-bold"
+            style={{ color: subject.color }}
           >
-            {config.label}
+            {session.sessionNumber}
           </span>
         </div>
-        <span className="text-[10px] font-mono text-gray-600">
-          {subject.displayTime}
-        </span>
-      </div>
 
-      {/* Content */}
-      <div className="p-5 flex justify-between items-center relative z-10">
-        <div className="flex-1 pr-4">
-          <h3 className="text-xl font-bold text-gray-200 mb-4 group-hover:text-white transition-colors">
-            {subject.name}
-          </h3>
-          <div className="space-y-2">
-            <div className="flex justify-between text-[10px] font-mono text-gray-500 uppercase">
-              <span>Stability</span>
-              <span
-                className={
-                  stabilityPercent >= 80
-                    ? "text-green-400"
-                    : stabilityPercent >= 50
-                      ? "text-yellow-400"
-                      : "text-red-400"
-                }
-              >
-                {stabilityPercent}%
-              </span>
-            </div>
-            <LedStrip
-              total={10}
-              active={ledCount}
-              color={ledColor}
-              className="h-3 gap-1"
+        {/* Subject Info */}
+        <div className="flex-1 min-w-0">
+          <div className="flex items-center gap-2">
+            <div
+              className="w-2 h-2 rounded-full shrink-0"
+              style={{
+                backgroundColor: subject.color,
+                boxShadow: `0 0 6px ${subject.color}60`,
+              }}
             />
+            <h3 className="text-sm font-bold text-gray-200 truncate group-hover:text-white transition-colors">
+              {subject.name}
+            </h3>
           </div>
+          {subject.startTime && subject.endTime && (
+            <span className="text-[9px] font-mono text-gray-600 ml-4">
+              {subject.startTime} — {subject.endTime}
+            </span>
+          )}
         </div>
 
-        {/* Toggle / Action */}
-        <div className="flex flex-col items-center gap-2 border-l border-white/5 pl-4">
-          {subject.isScheduledToday && !isMarked ? (
+        {/* Attendance Toggle */}
+        <div className="flex items-center gap-3 shrink-0">
+          {!isMarked ? (
             <button
               onClick={() => handleToggleAttendance(true)}
               disabled={isMarking}
@@ -179,7 +154,7 @@ export default function SubjectCard({ subject }: SubjectProps) {
             >
               {isMarking ? "..." : "Mark"}
             </button>
-          ) : isMarked ? (
+          ) : (
             <button
               onClick={() => handleToggleAttendance(false)}
               disabled={isMarking}
@@ -187,18 +162,24 @@ export default function SubjectCard({ subject }: SubjectProps) {
             >
               {isMarking ? "..." : "Undo"}
             </button>
-          ) : (
-            <span className="text-[9px] font-mono text-gray-600 uppercase">
-              Wait
-            </span>
           )}
           <ChromeToggle
             checked={isMarked}
-            disabled={!subject.isScheduledToday || isMarking}
+            disabled={isMarking}
             onChange={(checked) => handleToggleAttendance(checked)}
           />
         </div>
       </div>
+
+      {/* Marked indicator bar */}
+      {isMarked && (
+        <div
+          className="h-0.5 w-full"
+          style={{
+            background: `linear-gradient(90deg, ${subject.color}, transparent)`,
+          }}
+        />
+      )}
     </AcrylicBlock>
   );
 }

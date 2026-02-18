@@ -5,7 +5,7 @@ import GlassPanel from "@/components/ui/GlassPanel";
 import { MaterialIcon } from "@/components/ui/Icons";
 import { format } from "date-fns";
 import { motion } from "framer-motion";
-import { getSlotForDate, type AttendanceRecord, type DayData } from "./CalendarClient";
+import { getSlotsForDate, type AttendanceRecord, type DayData } from "./CalendarClient";
 
 interface DayDetailSheetProps {
   date: Date;
@@ -137,16 +137,33 @@ export default function DayDetailSheet({
                                 <span className="text-sm font-mono text-gray-200 truncate">
                                   {subject?.name || "Unknown"}
                                 </span>
-                                {(() => {
-                                  const slot = subject?.schedules
-                                    ? getSlotForDate(subject.schedules, date)
-                                    : null;
-                                  return slot ? (
-                                    <span className="text-[9px] font-mono text-gray-600">
-                                      {slot.startTime} — {slot.endTime}
+                                <div className="flex items-center gap-2">
+                                  {record.sessionNumber && (
+                                    <span className="text-[9px] font-mono text-[#4D79FF]">
+                                      Session {record.sessionNumber}
                                     </span>
-                                  ) : null;
-                                })()}
+                                  )}
+                                  {(() => {
+                                    const slots = subject?.schedules
+                                      ? getSlotsForDate(subject.schedules, date)
+                                      : [];
+                                    const slot = record.sessionNumber
+                                      ? slots.find(
+                                          (s) =>
+                                            s.sessionNumber ===
+                                            record.sessionNumber
+                                        )
+                                      : slots[0];
+                                    return slot?.startTime ? (
+                                      <span className="text-[9px] font-mono text-gray-600">
+                                        {slot.startTime}
+                                        {slot.endTime
+                                          ? ` — ${slot.endTime}`
+                                          : ""}
+                                      </span>
+                                    ) : null;
+                                  })()}
+                                </div>
                               </div>
                             </div>
                             <StatusBadge status={record.status} />

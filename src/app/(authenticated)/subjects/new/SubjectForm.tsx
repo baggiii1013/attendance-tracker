@@ -1,18 +1,8 @@
 "use client";
 
 import { GlassIconButton, MaterialIcon } from "@/components/ui/Icons";
-import TimeDial from "@/components/ui/TimeDial";
 import { useRouter } from "next/navigation";
-import { useState } from "react";
-
-const TIMES = [
-  "06:00", "06:30", "07:00", "07:30", "08:00", "08:30",
-  "09:00", "09:30", "10:00", "10:30", "11:00", "11:30",
-  "12:00", "12:30", "13:00", "13:30", "14:00", "14:30",
-  "15:00", "15:30", "16:00", "16:30", "17:00", "17:30",
-  "18:00", "18:30", "19:00", "19:30", "20:00", "20:30",
-  "21:00", "21:30", "22:00",
-];
+import { useEffect, useState } from "react";
 
 const DAYS = [
   { key: "Mon", label: "M" },
@@ -26,10 +16,20 @@ const DAYS = [
 
 const COLORS = ["#805af2", "#4D79FF", "#FF4D4D", "#22c55e", "#eab308", "#ec4899"];
 
+const TIMES = [
+  "06:00", "06:30", "07:00", "07:30", "08:00", "08:30",
+  "09:00", "09:30", "10:00", "10:30", "11:00", "11:30",
+  "12:00", "12:30", "13:00", "13:30", "14:00", "14:30",
+  "15:00", "15:30", "16:00", "16:30", "17:00", "17:30",
+  "18:00", "18:30", "19:00", "19:30", "20:00", "20:30",
+  "21:00", "21:30", "22:00",
+];
+
 export interface ScheduleSlot {
   day: string;
-  startTime: string;
-  endTime: string;
+  sessionNumber: number;
+  startTime?: string;
+  endTime?: string;
 }
 
 interface SubjectFormProps {
@@ -39,9 +39,13 @@ interface SubjectFormProps {
     slots: ScheduleSlot[];
     color: string;
   };
+  maxSessionsPerDay?: number;
 }
 
-export default function SubjectForm({ initialData }: SubjectFormProps) {
+export default function SubjectForm({
+  initialData,
+  maxSessionsPerDay: initialMax,
+}: SubjectFormProps) {
   const router = useRouter();
   const isEditing = !!initialData?._id;
 
@@ -49,17 +53,29 @@ export default function SubjectForm({ initialData }: SubjectFormProps) {
   const [slots, setSlots] = useState<ScheduleSlot[]>(
     initialData?.slots?.length
       ? initialData.slots
-      : [{ day: "Mon", startTime: "09:00", endTime: "10:30" }]
+      : [{ day: "Mon", sessionNumber: 1 }]
   );
   const [color, setColor] = useState(initialData?.color || "#805af2");
   const [isSubmitting, setIsSubmitting] = useState(false);
   const [activeSlotIndex, setActiveSlotIndex] = useState(0);
+  const [maxSessions, setMaxSessions] = useState(initialMax || 8);
+  const [showTime, setShowTime] = useState<Record<number, boolean>>({});
+  const [error, setError] = useState<string | null>(null);
+
+  // Fetch maxSessionsPerDay from user settings if not provided
+  useEffect(() => {
+    if (!initialMax) {
+      fetch("/api/user/settings")
+        .then((r) => r.json())
+        .then((data) => {
+          if (data.maxSessionsPerDay) setMaxSessions(data.maxSessionsPerDay);
+        })
+        .catch(() => {});
+    }
+  }, [initialMax]);
 
   const addSlot = () => {
-    setSlots((prev) => [
-      ...prev,
-      { day: "Mon", startTime: "09:00", endTime: "10:30" },
-    ]);
+    setSlots((prev) => [...prev, { day: "Mon", sessionNumber: 1 }]);
     setActiveSlotIndex(slots.length);
   };
 
@@ -69,15 +85,21 @@ export default function SubjectForm({ initialData }: SubjectFormProps) {
     setActiveSlotIndex(Math.max(0, activeSlotIndex - 1));
   };
 
-  const updateSlot = (index: number, field: keyof ScheduleSlot, value: string) => {
+  const updateSlot = (
+    index: number,
+    field: keyof ScheduleSlot,
+    value: string | number
+  ) => {
     setSlots((prev) =>
       prev.map((slot, i) => (i === index ? { ...slot, [field]: value } : slot))
     );
+    setError(null);
   };
 
   const handleSubmit = async () => {
     if (!name.trim() || slots.length === 0 || isSubmitting) return;
     setIsSubmitting(true);
+    setError(null);
 
     try {
       const url = isEditing
@@ -94,9 +116,13 @@ export default function SubjectForm({ initialData }: SubjectFormProps) {
       if (res.ok) {
         router.push("/dashboard");
         router.refresh();
+      } else {
+        const data = await res.json();
+        setError(data.error || "Failed to save");
       }
-    } catch (error) {
-      console.error("Failed to save subject:", error);
+    } catch (err) {
+      console.error("Failed to save subject:", err);
+      setError("Network error");
     } finally {
       setIsSubmitting(false);
     }
@@ -104,12 +130,14 @@ export default function SubjectForm({ initialData }: SubjectFormProps) {
 
   const handleReset = () => {
     setName("");
-    setSlots([{ day: "Mon", startTime: "09:00", endTime: "10:30" }]);
+    setSlots([{ day: "Mon", sessionNumber: 1 }]);
     setColor("#805af2");
     setActiveSlotIndex(0);
+    setError(null);
   };
 
   const currentSlot = slots[activeSlotIndex] || slots[0];
+  const sessionNumbers = Array.from({ length: maxSessions }, (_, i) => i + 1);
 
   return (
     <div className="relative flex h-full w-full flex-col max-w-md md:max-w-2xl mx-auto bg-[#0F0F11] overflow-hidden">
@@ -142,6 +170,14 @@ export default function SubjectForm({ initialData }: SubjectFormProps) {
 
       {/* Form */}
       <main className="flex-1 overflow-y-auto no-scrollbar relative z-10 px-6 py-6 space-y-8">
+        {/* Error Banner */}
+        {error && (
+          <div className="bg-red-500/10 border border-red-500/30 rounded-xl p-3 flex items-center gap-2">
+            <MaterialIcon name="error" size={18} className="text-red-400" />
+            <span className="text-sm font-mono text-red-400">{error}</span>
+          </div>
+        )}
+
         {/* Subject Input */}
         <div className="space-y-3">
           <label className="block text-xs font-mono text-gray-500 uppercase tracking-widest pl-2">
@@ -190,7 +226,7 @@ export default function SubjectForm({ initialData }: SubjectFormProps) {
               >
                 <span>{slot.day}</span>
                 <span className="text-[8px] text-gray-600">
-                  {slot.startTime}-{slot.endTime}
+                  S{slot.sessionNumber}
                 </span>
                 {slots.length > 1 && (
                   <span
@@ -246,27 +282,95 @@ export default function SubjectForm({ initialData }: SubjectFormProps) {
             </div>
           </div>
 
-          {/* Active Slot Time Dials */}
+          {/* Session Number Selector */}
           <div className="space-y-3">
             <label className="block text-[10px] font-mono text-gray-600 uppercase tracking-widest pl-2">
-              Time for Slot {activeSlotIndex + 1}
+              Session Number for Slot {activeSlotIndex + 1}
             </label>
-            <div className="grid grid-cols-2 gap-6 h-48">
-              <TimeDial
-                label="START"
-                dotColor="#4D79FF"
-                times={TIMES}
-                selectedTime={currentSlot?.startTime || "09:00"}
-                onTimeChange={(t) => updateSlot(activeSlotIndex, "startTime", t)}
-              />
-              <TimeDial
-                label="END"
-                dotColor="#FF4D4D"
-                times={TIMES}
-                selectedTime={currentSlot?.endTime || "10:30"}
-                onTimeChange={(t) => updateSlot(activeSlotIndex, "endTime", t)}
-              />
+            <div className="flex gap-2 flex-wrap px-2">
+              {sessionNumbers.map((sn) => {
+                const isActive = currentSlot?.sessionNumber === sn;
+                return (
+                  <button
+                    key={sn}
+                    onClick={() =>
+                      updateSlot(activeSlotIndex, "sessionNumber", sn)
+                    }
+                    className={`w-10 h-10 rounded-lg flex items-center justify-center font-mono text-sm font-bold transition-all active:scale-95 ${
+                      isActive
+                        ? "bg-[#4D79FF] text-white shadow-[0_0_15px_rgba(77,121,255,0.4)]"
+                        : "bg-[#1a1a1f] text-gray-600 border border-white/5 hover:border-white/15 hover:text-gray-400"
+                    }`}
+                  >
+                    {sn}
+                  </button>
+                );
+              })}
             </div>
+          </div>
+
+          {/* Optional Time (collapsed by default) */}
+          <div className="space-y-3">
+            <button
+              onClick={() =>
+                setShowTime((prev) => ({
+                  ...prev,
+                  [activeSlotIndex]: !prev[activeSlotIndex],
+                }))
+              }
+              className="flex items-center gap-2 text-[10px] font-mono text-gray-600 uppercase tracking-widest pl-2 hover:text-gray-400 transition-colors"
+            >
+              <MaterialIcon
+                name={
+                  showTime[activeSlotIndex] ? "expand_less" : "expand_more"
+                }
+                size={16}
+              />
+              Add Time (Optional)
+            </button>
+
+            {showTime[activeSlotIndex] && (
+              <div className="grid grid-cols-2 gap-4 px-2">
+                <div className="space-y-2">
+                  <label className="block text-[9px] font-mono text-gray-600 uppercase">
+                    Start Time
+                  </label>
+                  <select
+                    value={currentSlot?.startTime || ""}
+                    onChange={(e) =>
+                      updateSlot(activeSlotIndex, "startTime", e.target.value)
+                    }
+                    className="w-full bg-[#1a1a1f] border border-white/10 rounded-lg p-2.5 text-sm font-mono text-gray-300 outline-none focus:border-[#4D79FF]/50"
+                  >
+                    <option value="">None</option>
+                    {TIMES.map((t) => (
+                      <option key={t} value={t}>
+                        {t}
+                      </option>
+                    ))}
+                  </select>
+                </div>
+                <div className="space-y-2">
+                  <label className="block text-[9px] font-mono text-gray-600 uppercase">
+                    End Time
+                  </label>
+                  <select
+                    value={currentSlot?.endTime || ""}
+                    onChange={(e) =>
+                      updateSlot(activeSlotIndex, "endTime", e.target.value)
+                    }
+                    className="w-full bg-[#1a1a1f] border border-white/10 rounded-lg p-2.5 text-sm font-mono text-gray-300 outline-none focus:border-[#4D79FF]/50"
+                  >
+                    <option value="">None</option>
+                    {TIMES.map((t) => (
+                      <option key={t} value={t}>
+                        {t}
+                      </option>
+                    ))}
+                  </select>
+                </div>
+              </div>
+            )}
           </div>
         </div>
 
@@ -309,7 +413,11 @@ export default function SubjectForm({ initialData }: SubjectFormProps) {
           </div>
           <div className="flex-1 text-center relative z-10">
             <span className="font-bold text-lg tracking-[0.2em] text-white group-hover:text-white/90">
-              {isSubmitting ? "PROCESSING..." : "INITIALIZE"}
+              {isSubmitting
+                ? "PROCESSING..."
+                : isEditing
+                  ? "UPDATE"
+                  : "INITIALIZE"}
             </span>
           </div>
           <div className="absolute right-4 top-1/2 -translate-y-1/2 flex flex-col gap-1">

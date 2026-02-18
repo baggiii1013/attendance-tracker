@@ -12,6 +12,8 @@ async function getDashboardData(userId: string) {
   const user = await User.findById(userId).lean();
   if (!user) return null;
 
+  const maxSessions = user.maxSessionsPerDay ?? 8;
+
   const subjects = await Subject.find({ userId, isActive: true })
     .sort({ createdAt: -1 })
     .lean();
@@ -31,76 +33,81 @@ async function getDashboardData(userId: string) {
   const dayNames = ["Sun", "Mon", "Tue", "Wed", "Thu", "Fri", "Sat"];
   const todayDay = dayNames[new Date().getDay()];
 
-  // Map subjects with today's status
-  const subjectsWithStatus = subjects.map((subject) => {
-    const record = todayRecords.find(
-      (r) => r.subjectId.toString() === subject._id.toString()
-    );
+  // Build a session grid: for each sessionNumber 1..maxSessions,
+  // figure out which subject (if any) is assigned to that slot today.
+  type SessionSlot = {
+    sessionNumber: number;
+    subject: {
+      _id: string;
+      name: string;
+      color: string;
+      startTime?: string;
+      endTime?: string;
+    } | null;
+    attendanceMarked: boolean;
+    attendanceStatus: string | null;
+  };
 
-    // Get the current schedule (effectiveTo === null)
-    const currentSchedule = getScheduleForDate(subject.schedules || [], new Date());
+  const sessions: SessionSlot[] = [];
+
+  for (let sn = 1; sn <= maxSessions; sn++) {
+    let matchedSubject: SessionSlot["subject"] = null;
+    let record = null;
+
+    // Find which subject occupies this session slot on today's day
+    for (const subject of subjects) {
+      const currentSchedule = getScheduleForDate(
+        subject.schedules || [],
+        new Date()
+      );
+      if (!currentSchedule) continue;
+
+      const matchingSlot = currentSchedule.slots.find(
+        (s: IScheduleSlot) => s.day === todayDay && s.sessionNumber === sn
+      );
+      if (matchingSlot) {
+        matchedSubject = {
+          _id: subject._id.toString(),
+          name: subject.name,
+          color: subject.color,
+          startTime: matchingSlot.startTime,
+          endTime: matchingSlot.endTime,
+        };
+        // Find attendance record for this subject+session
+        record =
+          todayRecords.find(
+            (r) =>
+              r.subjectId.toString() === subject._id.toString() &&
+              r.sessionNumber === sn
+          ) || null;
+        break;
+      }
+    }
+
+    sessions.push({
+      sessionNumber: sn,
+      subject: matchedSubject,
+      attendanceMarked: !!record,
+      attendanceStatus: record?.status || null,
+    });
+  }
+
+  // Build subjects list for edit/delete access
+  const subjectsList = subjects.map((subject) => {
+    const currentSchedule = getScheduleForDate(
+      subject.schedules || [],
+      new Date()
+    );
     const todaySlots = currentSchedule
       ? currentSchedule.slots.filter((s: IScheduleSlot) => s.day === todayDay)
       : [];
 
-    const isScheduledToday = todaySlots.length > 0;
-
-    // Determine session status based on current time vs slot times
-    const now = new Date();
-    let sessionStatus: "active" | "upcoming" | "completed" | "inactive" = "inactive";
-
-    if (isScheduledToday && todaySlots.length > 0) {
-      // Use the earliest slot to determine status
-      const sortedSlots = [...todaySlots].sort((a, b) =>
-        a.startTime.localeCompare(b.startTime)
-      );
-
-      let hasActive = false;
-      let hasUpcoming = false;
-      let allCompleted = true;
-
-      for (const slot of sortedSlots) {
-        const [startH, startM] = slot.startTime.split(":").map(Number);
-        const [endH, endM] = slot.endTime.split(":").map(Number);
-        const startDate = new Date(now);
-        startDate.setHours(startH, startM, 0, 0);
-        const endDate = new Date(now);
-        endDate.setHours(endH, endM, 0, 0);
-
-        if (now >= startDate && now <= endDate) {
-          hasActive = true;
-          allCompleted = false;
-        } else if (now < startDate) {
-          hasUpcoming = true;
-          allCompleted = false;
-        }
-      }
-
-      if (hasActive) sessionStatus = "active";
-      else if (hasUpcoming) sessionStatus = "upcoming";
-      else if (allCompleted) sessionStatus = "completed";
-    }
-
-    // Build display time from first slot
-    const firstSlot = todaySlots[0] || (currentSchedule?.slots?.[0]);
-    const displayTime = firstSlot
-      ? `${firstSlot.startTime} — ${firstSlot.endTime}`
-      : "";
-
     return {
       _id: subject._id.toString(),
       name: subject.name,
-      slots: todaySlots.map((s: IScheduleSlot) => ({
-        day: s.day,
-        startTime: s.startTime,
-        endTime: s.endTime,
-      })),
-      displayTime,
       color: subject.color,
-      isScheduledToday,
-      sessionStatus,
-      attendanceMarked: !!record,
-      attendanceStatus: record?.status || null,
+      isScheduledToday: todaySlots.length > 0,
+      totalSlots: currentSchedule?.slots?.length || 0,
     };
   });
 
@@ -122,7 +129,9 @@ async function getDashboardData(userId: string) {
       totalAttendanceDays: user.totalAttendanceDays,
       attendancePercent,
     },
-    subjects: subjectsWithStatus,
+    sessions,
+    subjects: subjectsList,
+    maxSessionsPerDay: maxSessions,
   };
 }
 

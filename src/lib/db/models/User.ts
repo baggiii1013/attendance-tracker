@@ -15,6 +15,7 @@ export interface IUser extends Document {
   lastAttendanceDate?: Date;
   totalAttendanceDays: number;
   totalScheduledDays: number;
+  maxSessionsPerDay: number;
   isDisabled: boolean;
   createdAt: Date;
   updatedAt: Date;
@@ -33,6 +34,7 @@ const UserSchema = new Schema<IUser>(
     lastAttendanceDate: { type: Date },
     totalAttendanceDays: { type: Number, default: 0 },
     totalScheduledDays: { type: Number, default: 0 },
+    maxSessionsPerDay: { type: Number, default: 8, min: 1, max: 15 },
     isDisabled: { type: Boolean, default: false },
   },
   {

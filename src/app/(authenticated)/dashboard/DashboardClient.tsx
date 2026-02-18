@@ -6,7 +6,30 @@ import { MaterialIcon } from "@/components/ui/Icons";
 import LedStrip from "@/components/ui/LedStrip";
 import Image from "next/image";
 import Link from "next/link";
-import SubjectCard from "./SubjectCard";
+import { useRouter } from "next/navigation";
+import { useState } from "react";
+import SessionSlotCard from "./SubjectCard";
+
+interface SessionSlot {
+  sessionNumber: number;
+  subject: {
+    _id: string;
+    name: string;
+    color: string;
+    startTime?: string;
+    endTime?: string;
+  } | null;
+  attendanceMarked: boolean;
+  attendanceStatus: string | null;
+}
+
+interface SubjectInfo {
+  _id: string;
+  name: string;
+  color: string;
+  isScheduledToday: boolean;
+  totalSlots: number;
+}
 
 interface DashboardData {
   user: {
@@ -21,21 +44,13 @@ interface DashboardData {
     totalAttendanceDays: number;
     attendancePercent: number;
   };
-  subjects: Array<{
-    _id: string;
-    name: string;
-    slots: Array<{ day: string; startTime: string; endTime: string }>;
-    displayTime: string;
-    color: string;
-    isScheduledToday: boolean;
-    sessionStatus: "active" | "upcoming" | "completed" | "inactive";
-    attendanceMarked: boolean;
-    attendanceStatus: string | null;
-  }>;
+  sessions: SessionSlot[];
+  subjects: SubjectInfo[];
+  maxSessionsPerDay: number;
 }
 
 export default function DashboardClient({ data }: { data: DashboardData }) {
-  const { user, subjects } = data;
+  const { user, sessions, subjects } = data;
 
   // Generate a display name
   const displayName = user.name?.split(" ")[0]?.toUpperCase() || "OPERATOR";
@@ -43,6 +58,13 @@ export default function DashboardClient({ data }: { data: DashboardData }) {
   // Calculate LED counts
   const healthLeds = Math.round((user.attendancePercent / 100) * 6);
   const xpLevel = Math.min(Math.floor(user.xp / 500), 6);
+
+  // Count today's stats
+  const scheduledSessions = sessions.filter((s) => s.subject !== null);
+  const markedSessions = sessions.filter(
+    (s) => s.subject !== null && s.attendanceMarked
+  );
+  const freeSessions = sessions.filter((s) => s.subject === null);
 
   return (
     <>
@@ -162,23 +184,39 @@ export default function DashboardClient({ data }: { data: DashboardData }) {
           </AcrylicBlock>
         </div>
 
-        {/* Active Modules */}
+        {/* Today's Session Summary */}
+        <div className="flex items-center gap-4 mb-4 px-1">
+          <div className="flex items-center gap-1.5">
+            <div className="w-2 h-2 rounded-full bg-green-500" />
+            <span className="text-[10px] font-mono text-gray-500">
+              {markedSessions.length}/{scheduledSessions.length} MARKED
+            </span>
+          </div>
+          <div className="flex items-center gap-1.5">
+            <div className="w-2 h-2 rounded-full bg-gray-600" />
+            <span className="text-[10px] font-mono text-gray-500">
+              {freeSessions.length} FREE
+            </span>
+          </div>
+        </div>
+
+        {/* Active Modules Header */}
         <div className="flex items-center justify-between mb-4 px-1 border-b border-[#222] pb-2">
           <h2 className="text-xs font-bold uppercase tracking-widest text-gray-500 font-mono flex items-center gap-2">
             <span className="w-2 h-2 bg-gray-600 rounded-full" />
-            Active Modules
+            Today&apos;s Sessions
           </h2>
           <Link
             href="/subjects/new"
             className="text-gray-400 hover:text-white transition-colors text-[10px] font-mono uppercase bg-[#1a1a1a] px-3 py-1 rounded border border-[#333] hover:border-gray-500"
           >
-            Configure
+            + Module
           </Link>
         </div>
 
-        {/* Subject Cards */}
-        <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-          {subjects.length === 0 ? (
+        {/* Session Grid */}
+        <div className="space-y-3">
+          {sessions.length === 0 ? (
             <div className="acrylic-block rounded-xl p-8 text-center">
               <MaterialIcon
                 name="widgets"
@@ -186,21 +224,81 @@ export default function DashboardClient({ data }: { data: DashboardData }) {
                 className="text-gray-600 mb-4"
               />
               <p className="text-gray-400 font-mono text-sm mb-4">
-                No modules configured
+                No sessions configured
               </p>
               <Link
-                href="/subjects/new"
+                href="/settings"
                 className="text-[#4D79FF] font-mono text-xs uppercase tracking-widest hover:text-white transition-colors"
               >
-                + Add First Module
+                Set Up Sessions
               </Link>
             </div>
           ) : (
-            subjects.map((subject) => (
-              <SubjectCard key={subject._id} subject={subject} />
+            sessions.map((session) => (
+              <SessionSlotCard key={session.sessionNumber} session={session} />
             ))
           )}
         </div>
+
+        {/* Subjects Management Section */}
+        {subjects.length > 0 && (
+          <>
+            <div className="flex items-center justify-between mt-10 mb-4 px-1 border-b border-[#222] pb-2">
+              <h2 className="text-xs font-bold uppercase tracking-widest text-gray-500 font-mono flex items-center gap-2">
+                <span className="w-2 h-2 bg-[#805af2] rounded-full" />
+                All Modules
+              </h2>
+            </div>
+
+            <div className="space-y-2">
+              {subjects.map((subject) => (
+                <AcrylicBlock
+                  key={subject._id}
+                  className="p-3"
+                  borderColor={subject.color}
+                >
+                  <div className="flex items-center justify-between">
+                    <div className="flex items-center gap-3 min-w-0 flex-1">
+                      <div
+                        className="w-3 h-3 rounded-full shrink-0"
+                        style={{
+                          backgroundColor: subject.color,
+                          boxShadow: `0 0 6px ${subject.color}40`,
+                        }}
+                      />
+                      <div className="flex flex-col min-w-0">
+                        <span className="text-sm font-mono text-gray-200 truncate">
+                          {subject.name}
+                        </span>
+                        <span className="text-[9px] font-mono text-gray-600">
+                          {subject.totalSlots} slot
+                          {subject.totalSlots !== 1 ? "s" : ""} configured
+                          {subject.isScheduledToday && (
+                            <span className="text-green-500 ml-2">
+                              ● TODAY
+                            </span>
+                          )}
+                        </span>
+                      </div>
+                    </div>
+                    <div className="flex items-center gap-2">
+                      <Link
+                        href={`/subjects/${subject._id}/edit`}
+                        className="w-8 h-8 flex items-center justify-center rounded-lg bg-white/5 border border-white/10 text-gray-500 hover:text-[#4D79FF] hover:border-[#4D79FF]/30 transition-colors"
+                      >
+                        <MaterialIcon name="edit" size={16} />
+                      </Link>
+                      <DeleteSubjectButton
+                        subjectId={subject._id}
+                        subjectName={subject.name}
+                      />
+                    </div>
+                  </div>
+                </AcrylicBlock>
+              ))}
+            </div>
+          </>
+        )}
 
         {/* Add Button */}
         <div className="mt-8 flex justify-center pb-8">
@@ -220,5 +318,64 @@ export default function DashboardClient({ data }: { data: DashboardData }) {
         </div>
       </main>
     </>
+  );
+}
+
+function DeleteSubjectButton({
+  subjectId,
+  subjectName,
+}: {
+  subjectId: string;
+  subjectName: string;
+}) {
+  const [confirming, setConfirming] = useState(false);
+  const [deleting, setDeleting] = useState(false);
+  const router = useRouter();
+
+  const handleDelete = async () => {
+    setDeleting(true);
+    try {
+      const res = await fetch(`/api/subjects/${subjectId}`, {
+        method: "DELETE",
+      });
+      if (res.ok) {
+        router.refresh();
+      }
+    } catch (err) {
+      console.error("Failed to delete subject:", err);
+    } finally {
+      setDeleting(false);
+      setConfirming(false);
+    }
+  };
+
+  if (confirming) {
+    return (
+      <div className="flex items-center gap-1">
+        <button
+          onClick={handleDelete}
+          disabled={deleting}
+          className="text-[9px] font-mono text-red-400 bg-red-500/10 px-2 py-1 rounded border border-red-500/30 hover:bg-red-500/20 transition-colors disabled:opacity-50"
+        >
+          {deleting ? "..." : "YES"}
+        </button>
+        <button
+          onClick={() => setConfirming(false)}
+          className="text-[9px] font-mono text-gray-500 bg-white/5 px-2 py-1 rounded border border-white/10 hover:bg-white/10 transition-colors"
+        >
+          NO
+        </button>
+      </div>
+    );
+  }
+
+  return (
+    <button
+      onClick={() => setConfirming(true)}
+      className="w-8 h-8 flex items-center justify-center rounded-lg bg-white/5 border border-white/10 text-gray-500 hover:text-red-400 hover:border-red-400/30 transition-colors"
+      title={`Delete ${subjectName}`}
+    >
+      <MaterialIcon name="delete" size={16} />
+    </button>
   );
 }
