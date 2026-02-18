@@ -7,17 +7,38 @@ import { updateStreak } from "@/lib/streak";
 import { NextRequest, NextResponse } from "next/server";
 
 // GET /api/attendance?date=YYYY-MM-DD — get attendance records for a date
+// GET /api/attendance?startDate=YYYY-MM-DD&endDate=YYYY-MM-DD — get attendance records for a date range
 export async function GET(req: NextRequest) {
   const session = await auth();
   if (!session?.user?.id) {
     return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
   }
 
+  const startDateParam = req.nextUrl.searchParams.get("startDate");
+  const endDateParam = req.nextUrl.searchParams.get("endDate");
+
+  await connectDB();
+
+  // Range query mode
+  if (startDateParam && endDateParam) {
+    const startDate = new Date(startDateParam);
+    startDate.setHours(0, 0, 0, 0);
+    const endDate = new Date(endDateParam);
+    endDate.setHours(23, 59, 59, 999);
+
+    const records = await AttendanceRecord.find({
+      userId: session.user.id,
+      date: { $gte: startDate, $lte: endDate },
+    }).populate("subjectId", "name color startTime endTime activeDays");
+
+    return NextResponse.json({ records });
+  }
+
+  // Single date mode (existing behavior)
   const dateParam = req.nextUrl.searchParams.get("date");
   const date = dateParam ? new Date(dateParam) : new Date();
   date.setHours(0, 0, 0, 0);
 
-  await connectDB();
   const records = await AttendanceRecord.find({
     userId: session.user.id,
     date,
